@@ -1,5 +1,5 @@
 /**
- * Detailed usage of the example can be found in the [README.md](./README.md) file
+ * display for agro drill lcd using waveshare SKU 27078 7" inch esp lcd
  */
 #define LV_CONF_INCLUDE_SIMPLE      // place befor lvgl.h
 #include <Arduino.h>
