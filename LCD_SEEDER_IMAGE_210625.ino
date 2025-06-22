@@ -7,12 +7,19 @@
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
 #include "color.h"
+#include "drill_up.h"
+#include "drill_down.h"
+
+
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
 
 #if LVGL_PORT_AVOID_TEARING_MODE
     #error "This example does not support the avoid tearing function. Please set `LVGL_PORT_AVOID_TEARING_MODE` to `0` in the `lvgl_v8_port.h` file."
 #endif
+//extern const lv_img_dsc_t img_drill_up;
+//extern const lv_img_dsc_t img_drill_down;
+
 LV_IMG_DECLARE(img_drill_down);
 LV_IMG_DECLARE(img_drill_up);
 

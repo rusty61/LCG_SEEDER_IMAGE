@@ -1,5 +1,5 @@
 /**
- * Detailed usage of the example can be found in the [README.md](./README.md) file
+ * Display lay out for Wavedhare  SKU 27078 7" inch lCD Sensors to be added 
  */
 #define LV_CONF_INCLUDE_SIMPLE      // place befor lvgl.h
 #include <Arduino.h>
@@ -7,13 +7,18 @@
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
 #include "color.h"
+#include "drill_up.h"
+#include "drill_down.h"
+
+
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
 
 #if LVGL_PORT_AVOID_TEARING_MODE
     #error "This example does not support the avoid tearing function. Please set `LVGL_PORT_AVOID_TEARING_MODE` to `0` in the `lvgl_v8_port.h` file."
 #endif
-
+LV_IMG_DECLARE(img_drill_down);
+LV_IMG_DECLARE(img_drill_up);
 
 
 /* Bin level bars */
@@ -31,9 +36,8 @@ static lv_obj_t * area_label= NULL;
 /* Alarm and status */
 static lv_obj_t * alarm_box= NULL;
 
-LV_IMG_DECLARE(img_drill_down);
-LV_IMG_DECLARE(img_drill_up);
-static lv_obj_t * drill_status= NULL;
+
+static lv_obj_t * drill_indicator_img = NULL; // Renamed and will replace the drill_status label
 
 /* Spinner arc */
 static lv_obj_t * spinner;
@@ -86,7 +90,7 @@ void setup()
 
    
     lv_obj_t *scr = lv_scr_act();
-lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
    
 
 
@@ -199,28 +203,25 @@ lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
     lv_obj_center(area_label); // Center label within the panel
 
 
-  // Drill down status
-    //drill_status = lv_label_create(scr); // Declaration moved to global
-    current_y_offset += label_spacing;
-    drill_status = lv_label_create(scr);
-    lv_obj_t * drill_img = lv_img_create(scr);                // create an image object
-lv_img_set_src(drill_img, &img_drill_down);
-lv_obj_set_width (drill_img, 140);        // 120px wide
-lv_obj_set_height(drill_img, LV_SIZE_CONTENT);              // point it at your img_drill_down asset
-lv_obj_align(drill_img, LV_ALIGN_CENTER, 0, 100);       // position it (e.g. 10px from top/left)  
+  // Drill Indicator Image
+    // current_y_offset += label_spacing; // This offset logic might need re-evaluation if other elements depended on drill_status label's height.
+                                        // For now, we remove the label and place the image.
+    drill_indicator_img = lv_img_create(scr);                   // create the image object using the global variable
+    lv_img_set_src(drill_indicator_img, &img_drill_up);         // Start with drill UP
+    lv_obj_set_width(drill_indicator_img, 140);                 // Set width (as original)
+    lv_obj_set_height(drill_indicator_img, LV_SIZE_CONTENT);    // Set height (as original)
+    lv_obj_align(drill_indicator_img, LV_ALIGN_CENTER, 0, 100); // Position it (original image position)
 
-    lv_label_set_text_fmt(drill_status, "Drill: UP");
-    lv_obj_set_width(drill_status, 200);
-    lv_obj_set_height(drill_status, LV_SIZE_CONTENT);
-    lv_obj_set_style_pad_all(drill_status, 5, 0);
-    lv_obj_set_style_border_width(drill_status, 1, 0);
-    lv_obj_set_style_border_color(drill_status, lv_color_white(), 0);               // White border
-    lv_obj_set_style_border_opa(drill_status, LV_OPA_COVER, 0);
-    // New styling for drill_status background and text
-    lv_obj_set_style_bg_color(drill_status, lv_palette_main(LV_PALETTE_YELLOW), 3); // Yellow background
-    lv_obj_set_style_text_color(drill_status, lv_color_black(), 0);                 // Black text
-    lv_obj_set_style_bg_opa(drill_status, LV_OPA_COVER, 0); // Ensure background is opaque
-    lv_obj_align(drill_status, LV_ALIGN_CENTER, 0, 200);
+    // Style for drill UP (RED indicator) - Attempting recolor first
+    lv_obj_set_style_img_recolor(drill_indicator_img, COLOR_RED, 0);
+    lv_obj_set_style_img_recolor_opa(drill_indicator_img, LV_OPA_COVER, 0);
+    // Fallback: if images are not monochrome, recolor won't work as expected.
+    // In that case, one would use:
+    // lv_obj_set_style_bg_color(drill_indicator_img, COLOR_RED, 0);
+    // lv_obj_set_style_bg_opa(drill_indicator_img, LV_OPA_COVER, 0);
+    // Ensure image has transparency for bg color to be visible as a 'tint' or border.
+
+    
 
      // Alarm indicator
     //alarm_box = lv_label_create(scr); // Declaration moved to global
@@ -238,7 +239,7 @@ lv_obj_align(drill_img, LV_ALIGN_CENTER, 0, 100);       // position it (e.g. 10p
     lv_obj_set_style_bg_color(alarm_box, lv_palette_main(LV_PALETTE_RED), 3); // Red background
     lv_obj_set_style_text_color(alarm_box, lv_color_black(), 0);             // White text
     lv_obj_set_style_bg_opa(alarm_box, LV_OPA_COVER, 0); // Ensure background is opaque
-    lv_obj_align(alarm_box, LV_ALIGN_CENTER, 0, 30);
+    lv_obj_align(alarm_box, LV_ALIGN_CENTER, 0, 0);
 
 
     // Create and style the spinner
@@ -283,11 +284,17 @@ void loop()
             if (speed_label) lv_label_set_text_fmt(speed_label, "Speed: %.1f km/h", 42.5);
             if (rate_label) lv_label_set_text_fmt(rate_label, "Rate: %.1f ha/h", 3.1);
             if (area_label) lv_label_set_text_fmt(area_label, "Area: %.1f ha", 12.7);
-            if (drill_status) lv_label_set_text(drill_status, "Drill: DOWN");
-                if (alarm_box) {
-                    lv_label_set_text(alarm_box, "ALARM!");
-                    // Text color is now fixed to white in setup, background makes it an alarm
-                }
+            // Update drill indicator for DOWN state (GREEN)
+            if (drill_indicator_img) {
+                lv_img_set_src(drill_indicator_img, &img_drill_down);
+                lv_obj_set_style_img_recolor(drill_indicator_img, COLOR_GREEN, 0);
+                lv_obj_set_style_img_recolor_opa(drill_indicator_img, LV_OPA_COVER, 0);
+                // Fallback: lv_obj_set_style_bg_color(drill_indicator_img, COLOR_GREEN, 0);
+            }
+            if (alarm_box) {
+                lv_label_set_text(alarm_box, "ALARM!");
+                // Text color is now fixed to white in setup, background makes it an alarm
+            }
         } else {
             // State 0: Set to zero or 'off' values
             if (bin_left) lv_bar_set_value(bin_left, 25, LV_ANIM_OFF);
@@ -295,10 +302,16 @@ void loop()
             if (speed_label) lv_label_set_text_fmt(speed_label, "Speed: %.1f km/h", 0.0);
             if (rate_label) lv_label_set_text_fmt(rate_label, "Rate: %.1f ha/h", 0.0);
             if (area_label) lv_label_set_text_fmt(area_label, "Area: %.1f ha", 0.0);
-            if (drill_status) lv_label_set_text(drill_status, "Drill: UP");
-                if (alarm_box) {
-                    lv_label_set_text(alarm_box, ""); // Clear alarm
-                    // Text color is now fixed to white in setup
+            // Update drill indicator for UP state (RED)
+            if (drill_indicator_img) {
+                lv_img_set_src(drill_indicator_img, &img_drill_up);
+                lv_obj_set_style_img_recolor(drill_indicator_img, COLOR_RED, 0);
+                lv_obj_set_style_img_recolor_opa(drill_indicator_img, LV_OPA_COVER, 0);
+                // Fallback: lv_obj_set_style_bg_color(drill_indicator_img, COLOR_RED, 0);
+            }
+            if (alarm_box) {
+                lv_label_set_text(alarm_box, ""); // Clear alarm
+                // Text color is now fixed to white in setup
                 }
         }
 
