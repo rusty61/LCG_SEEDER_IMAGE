@@ -1,5 +1,5 @@
 /**
-
+ * Detailed usage of the example can be found in the [README.md](./README.md) file
  */
 #define LV_CONF_INCLUDE_SIMPLE      // place befor lvgl.h
 #include <Arduino.h>
