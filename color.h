@@ -6,7 +6,7 @@
 /* === Standard Colors === */
 #define COLOR_WHITE      lv_color_make(0xFF, 0xFF, 0xFF)
 #define COLOR_RED        lv_color_make(0xFF, 0x00, 0x00)
-#define COLOR_GREEN      lv_color_make(0x00, 0xE0, 0x00)
+#define COLOR_GREEN      lv_color_make(0x47, 0xFC, 0x05)
 #define COLOR_BLUE       lv_color_make(0x00, 0x00, 0xFF)
 #define COLOR_SILVER     lv_color_make(0xC0, 0xC0, 0xC0)
 #define COLOR_YELLOW     lv_color_make(0xFF, 0xFF, 0x00)
