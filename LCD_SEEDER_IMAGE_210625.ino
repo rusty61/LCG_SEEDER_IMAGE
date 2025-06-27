@@ -21,15 +21,7 @@
             // Buffers to hold formatted strings
             char speedBuf[16], rateBuf[16], areaBuf[16];
 
-            // Format float to string: dtostrf(value, width, precision, buffer)
-            dtostrf(currentSpeed, 4, 1, speedBuf);  // e.g., 42.5 -> "42.5"
-            dtostrf(currentRate, 4, 1, rateBuf);    // e.g., 3.1  -> "3.1"
-            dtostrf(currentArea, 5, 1, areaBuf);    // e.g., 12.7 -> "12.7"
-
-            char speedLabel[32], rateLabel[32], areaLabel[32];
-            snprintf(speedLabel, sizeof(speedLabel), "Speed: %s km/h", speedBuf);
-            snprintf(rateLabel, sizeof(rateLabel), "Rate: %s ha/h", rateBuf);
-            snprintf(areaLabel, sizeof(areaLabel), "Area: %s ha", areaBuf);
+            
 
             /* Bin level bars */
             static lv_obj_t *bin_left = NULL;
@@ -44,6 +36,7 @@
             static lv_obj_t *area_label = NULL;
 
             /* Alarm and status */
+            lv_obj_t *alarm_btn;
             static lv_obj_t *alarm_box = NULL;
             /*  dril postion wiget  */
             static lv_obj_t *drill_box = NULL;
@@ -249,14 +242,15 @@
             lv_obj_set_style_bg_color(alarm_btn, lv_palette_main(LV_PALETTE_RED), 0);  // Red background
             lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
             lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
-            lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT 0, 0);
+            lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT, 0, 0);
 
             // Create label inside button
             lv_obj_t *alarm_label = lv_label_create(alarm_btn);
             lv_label_set_text(alarm_label, "PUSH");
 
-            // Attach event callback
-            lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED,
+            
+// Attach event callback
+lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 
 
                 // Create and style the spinner
@@ -286,7 +280,15 @@
             // LVGL task handler
             lv_timer_handler();  // Should be called periodically
             delay(5);            // Small delay for LVGL task handling
+// Format float to string: dtostrf(value, width, precision, buffer)
+            dtostrf(currentSpeed, 4, 1, speedBuf);  // e.g., 42.5 -> "42.5"
+            dtostrf(currentRate, 4, 1, rateBuf);    // e.g., 3.1  -> "3.1"
+            dtostrf(currentArea, 5, 1, areaBuf);    // e.g., 12.7 -> "12.7"
 
+            char speedLabel[32], rateLabel[32], areaLabel[32];
+            snprintf(speedLabel, sizeof(speedLabel), "Speed: %s km/h", speedBuf);
+            snprintf(rateLabel, sizeof(rateLabel), "Rate: %s ha/h", rateBuf);
+            snprintf(areaLabel, sizeof(areaLabel), "Area: %s ha", areaBuf);
             unsigned long current_time = millis();
             if (current_time - last_toggle_time >= toggle_interval) {
                 last_toggle_time = current_time;
