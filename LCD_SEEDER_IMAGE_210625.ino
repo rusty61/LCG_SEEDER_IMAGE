@@ -46,6 +46,7 @@
             }
 
             /* Spinner arc */
+           /* Spinner arc */
             static lv_obj_t *spinner;
             static lv_style_t style_arc;
             static lv_anim_t anim;
@@ -60,9 +61,11 @@
 
             static bool test_mode_toggle_state = false;  // General toggle for values
             static unsigned long last_toggle_time = 0;
-            const unsigned long toggle_interval = 8000;  // 2 seconds
+            const unsigned long toggle_interval = 8000;  // 8 seconds
 
-
+                float currentSpeed = 0;
+                float currentRate = 2;
+                float totalArea = 0;
 
             void setup() {
             Serial.begin(115200);
@@ -142,17 +145,17 @@
             lv_obj_set_style_text_color(lbl_bin_right_name, COLOR_SILVER, 0);
             lv_obj_align_to(lbl_bin_right_name, bin_right, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);  // 5px spacing below the bar
 
-            int current_y_offset = 170;
-            int label_spacing = 100;  // Estimated height + spacing for each label box. Adjust if needed.
-            int x_offset = -5;        //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
+            int current_y_offset = 140;
+            int label_spacing = 110;  // Estimated height + spacing for each label box. Adjust if needed.
+            int x_offset = -20;        //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
 
             // Ground speed
             // Create panel_speed (x_offset and current_y_offset are already defined)
             panel_speed = lv_obj_create(scr);
             lv_obj_set_size(panel_speed, 250, 100);  // Width 300, height wraps content DEPTH IS THE SECOND NUMBER
-            lv_obj_set_style_bg_color(panel_speed, COLOR_AQUA, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(panel_speed, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_speed, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_border_width(panel_speed, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(panel_speed, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_border_color(panel_speed, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_radius(panel_speed, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_pad_all(panel_speed, 8, LV_PART_MAIN | LV_STATE_DEFAULT);  // Panel padding
@@ -163,17 +166,17 @@
             lv_label_set_text_fmt(speed_label, "Speed: %.1f km/h", 0.0);  // Keep this
 
             // New text styling for speed_label:
-            lv_obj_set_style_text_color(speed_label, CUSTOM_COLOR_1, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(speed_label, COLOR_YELLOW, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_center(speed_label);  // Center label within the panel
 
             // Seeding rate
             current_y_offset += label_spacing;  // Keep this line from the previous layout logic
             panel_rate = lv_obj_create(scr);
             lv_obj_set_size(panel_rate, 250, 100);
-            lv_obj_set_style_bg_color(panel_rate, COLOR_GREEN, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_color(panel_rate, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_rate, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_border_width(panel_rate, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(panel_rate, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_border_color(panel_rate, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_radius(panel_rate, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_pad_all(panel_rate, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -184,8 +187,8 @@
             lv_label_set_text_fmt(rate_label, "Rate: %.1f ha/h", 0.0);  // Keep its text format
 
             // New text styling for rate_label:
-            lv_obj_set_style_text_color(rate_label, COLOR_NAVY, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(rate_label, &lv_font_montserrat_34, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(rate_label, COLOR_YELLOW, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(rate_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_center(rate_label);  // Center label within the panel
 
             // Total area sown
@@ -194,7 +197,7 @@
             lv_obj_set_size(panel_area, 250, 100);
             lv_obj_set_style_bg_color(panel_area, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_area, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_border_width(panel_area, 3, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(panel_area, 5, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_border_color(panel_area, lv_color_white(), LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_radius(panel_area, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_pad_all(panel_area, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -206,24 +209,25 @@
 
             // New text styling for area_label:
             lv_obj_set_style_text_color(area_label, COLOR_YELLOW, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_font(area_label, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_font(area_label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_center(area_label);  // Center label within the panel
 
             // Create a box/container (object)
             drill_box = lv_obj_create(scr);
-            lv_obj_set_size(drill_box, 190, 140);
+            lv_obj_set_size(drill_box, 180, 110);
             lv_obj_set_style_pad_all(drill_box, 9, 0);
             lv_obj_set_style_border_width(drill_box, 3, 0);
             lv_obj_set_style_border_color(drill_box, lv_color_white(), 0);
             lv_obj_set_style_border_opa(drill_box, LV_OPA_COVER, 0);
             // Don't set bg here; the loop will control it                   // LV_ALIGN_CENTER  LV_ALIGN_RIGHT_MID  LV_ALIGN_LEFT_MID
-            //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
+                                                                              //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
             lv_obj_set_style_bg_opa(drill_box, LV_OPA_COVER, 0);
-            lv_obj_align(drill_box, LV_ALIGN_CENTER, -10, 140);
+            lv_obj_align(drill_box, LV_ALIGN_CENTER, -20, 140);
 
             drill_label = lv_label_create(drill_box);
             lv_obj_set_style_text_font(drill_label, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_label_set_text(drill_label, "DRILL\nDOWN");  // Initial text
+           lv_obj_set_style_text_align(drill_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_center(drill_label);
 
 
@@ -231,43 +235,49 @@
 
             // Alarm indicator
             //alarm_box = lv_label_create(scr); // Declaration moved to global
-            current_y_offset += label_spacing;
+            //current_y_offset += label_spacing;
             alarm_btn = lv_btn_create(scr);
-            lv_obj_set_width(alarm_btn, 150);
-            lv_obj_set_height(alarm_btn, LV_SIZE_CONTENT);
-            lv_obj_set_style_pad_all(alarm_btn, 5, 0);
-            lv_obj_set_style_border_width(alarm_btn, 1, 0);
+            lv_obj_set_width(alarm_btn, 160);
+            lv_obj_set_height(alarm_btn, 90);
+            lv_obj_set_style_pad_all(alarm_btn, 10, 0);
+            lv_obj_set_style_border_width(alarm_btn, 3, 0);
             lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
             lv_obj_set_style_border_opa(alarm_btn, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color(alarm_btn, lv_palette_main(LV_PALETTE_RED), 0);  // Red background
+            lv_obj_set_style_bg_color(alarm_btn,CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);  // Red background  CUSTOM_COLOR_2
             lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
             lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
-            lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT, 0, 0);
+            lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT, -70, 20);
 
             // Create label inside button
             lv_obj_t *alarm_label = lv_label_create(alarm_btn);
-            lv_label_set_text(alarm_label, "PUSH");
+            
+            lv_label_set_text(alarm_label, "PUSH TO\nCLEAR ALARM");
+            lv_obj_set_style_text_align(alarm_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+         
 
             
 // Attach event callback
 lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 
 
-                // Create and style the spinner
-                spinner = lv_spinner_create(scr, 500, 50); // arc length 60, spin time 1000ms
-                lv_obj_set_size(spinner, 120, 120);
-                lv_obj_align(spinner, LV_ALIGN_CENTER, -20, -140); // LV_ALIGN_CENTER  LV_ALIGN_RIGHT_MID  LV_ALIGN_LEFT_MID
+       spinner = lv_spinner_create(scr, 750, 40); // arc length 60, spin time 1000ms
+                lv_obj_set_size(spinner, 135, 135);
+                lv_obj_align(spinner, LV_ALIGN_CENTER, -20, -160); // LV_ALIGN_CENTER  LV_ALIGN_RIGHT_MID  LV_ALIGN_LEFT_MID
                                                                 //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
                 // Style the spinner to have a green arc
                 // For LVGL v8, styling is done via parts and states.
                 // We want to style the LV_PART_INDICATOR which is the arc of the spinner.
-                lv_obj_set_style_arc_color(spinner, lv_color_make(0x47, 0xFC, 0x05), LV_PART_INDICATOR); // add this lv_color_make
+                lv_obj_set_style_arc_color(spinner, lv_color_make(0x80, 0x00, 0x80), LV_PART_INDICATOR); // add this lv_color_make
                 lv_obj_set_style_arc_width(spinner, 20, LV_PART_INDICATOR); // Make the arc a bit thicker for visibility
+                // Make the base/background track arc wide (e.g., 30px)
+                 lv_obj_set_style_arc_width(spinner, 19, LV_PART_MAIN);
             /* Add a label to the center of the spinner */
                 lv_obj_t * spinner_label = lv_label_create(spinner);
                 lv_label_set_text(spinner_label, "CLUTCH\nENGAGED");  //engaged
+                 lv_obj_set_style_text_align(spinner_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
                 lv_obj_center(spinner_label);
-                lv_obj_set_style_text_color(spinner_label, lv_color_white(), 0); // Set text color to white
+                lv_obj_set_style_text_color(spinner_label, lv_color_make(0xC0, 0xC0, 0xC0), 0); // Set text color to white
 
 
                 lvgl_port_unlock();
@@ -283,7 +293,7 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 // Format float to string: dtostrf(value, width, precision, buffer)
             dtostrf(currentSpeed, 4, 1, speedBuf);  // e.g., 42.5 -> "42.5"
             dtostrf(currentRate, 4, 1, rateBuf);    // e.g., 3.1  -> "3.1"
-            dtostrf(currentArea, 5, 1, areaBuf);    // e.g., 12.7 -> "12.7"
+            dtostrf(totalArea, 5, 1, areaBuf);    // e.g., 12.7 -> "12.7"
 
             char speedLabel[32], rateLabel[32], areaLabel[32];
             snprintf(speedLabel, sizeof(speedLabel), "Speed: %s km/h", speedBuf);
@@ -297,10 +307,10 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
                 lvgl_port_lock(-1);  // Lock LVGL access
 
                 if (test_mode_toggle_state) {
-
-                float currentSpeed = 12.3;
-                float currentRate = 3.45;
-                float totalArea = 7.892;
+                currentSpeed = 8.7;
+                 currentRate = 25.5;
+                totalArea = 85.2;
+                
                 // State 1: Set to sample values
                 if (bin_left) lv_bar_set_value(bin_left, 100, LV_ANIM_OFF);
                 if (bin_right) lv_bar_set_value(bin_right, 100, LV_ANIM_OFF);
@@ -331,9 +341,9 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 
 
                 } else {
-                float currentSpeed = 11.3;
-                float currentRate = 2.85;
-                float totalArea = 15.2;
+                 currentSpeed = 11.3;
+                 currentRate = 2.85;
+               totalArea = 15.2;
                 // State 0: Set to zero or 'off' values
                 if (bin_left) lv_bar_set_value(bin_left, 25, LV_ANIM_OFF);
                 if (bin_right) lv_bar_set_value(bin_right, 15, LV_ANIM_OFF);
@@ -366,8 +376,10 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
             lv_obj_t *btn = lv_event_get_target(e);
             lv_obj_t *label = lv_obj_get_child(btn, 0);
 
-            lv_label_set_text(label, "ACK");
+            lv_label_set_text(label, "ALARM\nACKNOWLEDGED");
             lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_GREEN), 0);
+            lv_obj_set_style_text_font(btn, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_align(btn, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_color(btn, lv_color_white(), 0);
 
             // Add alarm-clearing logic here
@@ -390,8 +402,8 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
                 warn_label = lv_label_create(lv_scr_act());
                 lv_label_set_text(warn_label, "WARNING!");
                 lv_obj_set_style_text_color(warn_label, lv_palette_main(LV_PALETTE_RED), 0);
-                lv_obj_set_style_text_font(warn_label, &lv_font_montserrat_28, 0);  // Larger font (optional)
-                lv_obj_align(warn_label, LV_ALIGN_TOP_MID, 0, 20);
+                lv_obj_set_style_text_font(warn_label, &lv_font_montserrat_42, 0);  // Larger font (optional)
+                lv_obj_align(warn_label, LV_ALIGN_CENTER, -20, -10);
             } else {
                 lv_label_set_text(warn_label, "WARNING!");
                 lv_obj_clear_flag(warn_label, LV_OBJ_FLAG_HIDDEN);

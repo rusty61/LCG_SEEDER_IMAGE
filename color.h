@@ -25,7 +25,7 @@
  * Replace the hex values with your desired RGB.
  */
 #define CUSTOM_COLOR_1   lv_color_make(0x00, 0x00, 0x00)  // black
-#define CUSTOM_COLOR_2   lv_color_make(0x00, 0x00, 0x00)
+#define CUSTOM_COLOR_2   lv_color_make(0xD9, 0x00, 0x00)   // red
 #define CUSTOM_COLOR_3   lv_color_make(0x00, 0x00, 0x00)
 #define CUSTOM_COLOR_4   lv_color_make(0x00, 0x00, 0x00)
 #define CUSTOM_COLOR_5   lv_color_make(0x00, 0x00, 0x00)
