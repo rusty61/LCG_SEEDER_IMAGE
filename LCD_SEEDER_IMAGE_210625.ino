@@ -16,12 +16,23 @@
             #error "This example does not support the avoid tearing function. Please set `LVGL_PORT_AVOID_TEARING_MODE` to `0` in the `lvgl_v8_port.h` file."
             #endif
 
+           
+             Board *board = nullptr; // Global variable
 
 
             // Buffers to hold formatted strings
             char speedBuf[16], rateBuf[16], areaBuf[16];
 
-            
+            // Forward declarations for LVGL callback functions
+void backlight_slider_event_cb(lv_event_t *e);
+void show_main_page();
+void show_settings_page(lv_event_t * e);
+
+// Global UI objects
+lv_obj_t *backlight_slider = nullptr;
+lv_obj_t *main_main_scr = nullptr;
+lv_obj_t *settings_main_scr = nullptr;
+lv_obj_t *settings_btn = nullptr;
 
             /* Bin level bars */
             static lv_obj_t *bin_left = NULL;
@@ -71,7 +82,8 @@
             Serial.begin(115200);
 
             Serial.println("Initializing board");
-            Board *board = new Board();
+            //Board *board = new Board();
+            board = new Board(); 
             board->init();
             #if LVGL_PORT_AVOID_TEARING_MODE
             auto lcd = board->getLCD();
@@ -98,15 +110,16 @@
             /* Lock the mutex due to the LVGL APIs are not thread-safe */
             lvgl_port_lock(-1);
 
+main_main_scr = lv_main_scr_act();
 
-            lv_obj_t *scr = lv_scr_act();
-            lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
-
+            //lv_obj_t *main_scr = lv_main_scr_act();
+            //lv_obj_set_style_bg_color(main_scr, lv_color_black(), 0);
+            lv_obj_set_style_bg_color(main_scr, lv_color_black(), 0);
 
 
             // Bin level bars
-            //bin_left = lv_bar_create(scr); // Declaration moved to global
-            bin_left = lv_bar_create(scr);
+            //bin_left = lv_bar_create(main_scr); // Declaration moved to global
+            bin_left = lv_bar_create(main_scr);
             lv_obj_set_size(bin_left, 80, 390);
             lv_obj_align(bin_left, LV_ALIGN_LEFT_MID, 30, 0);
             lv_bar_set_range(bin_left, 0, 100);
@@ -119,15 +132,15 @@
             lv_obj_set_style_bg_color(bin_left, COLOR_YELLOW, LV_PART_INDICATOR);
 
             // Create and position label for left bin
-            lbl_bin_left_name = lv_label_create(scr);
+            lbl_bin_left_name = lv_label_create(main_scr);
             lv_label_set_text(lbl_bin_left_name, "SEED");
             lv_obj_set_style_text_color(lbl_bin_left_name, COLOR_SILVER, 0);
             lv_obj_align_to(lbl_bin_left_name, bin_left, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);  // 5px spacing below the bar
 
 
 
-            //bin_right = lv_bar_create(scr); // Declaration moved to global
-            bin_right = lv_bar_create(scr);
+            //bin_right = lv_bar_create(main_scr); // Declaration moved to global
+            bin_right = lv_bar_create(main_scr);
             lv_obj_set_size(bin_right, 80, 390);
             lv_obj_align(bin_right, LV_ALIGN_LEFT_MID, 150, 0);
             lv_bar_set_range(bin_right, 0, 100);
@@ -140,7 +153,7 @@
             lv_obj_set_style_bg_color(bin_right, COLOR_ORANGE, LV_PART_INDICATOR);
 
             // Create and position label for right bin
-            lbl_bin_right_name = lv_label_create(scr);
+            lbl_bin_right_name = lv_label_create(main_scr);
             lv_label_set_text(lbl_bin_right_name, "FERTILIZER");
             lv_obj_set_style_text_color(lbl_bin_right_name, COLOR_SILVER, 0);
             lv_obj_align_to(lbl_bin_right_name, bin_right, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);  // 5px spacing below the bar
@@ -151,7 +164,7 @@
 
             // Ground speed
             // Create panel_speed (x_offset and current_y_offset are already defined)
-            panel_speed = lv_obj_create(scr);
+            panel_speed = lv_obj_create(main_scr);
             lv_obj_set_size(panel_speed, 250, 100);  // Width 300, height wraps content DEPTH IS THE SECOND NUMBER
             lv_obj_set_style_bg_color(panel_speed, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_speed, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -172,7 +185,7 @@
 
             // Seeding rate
             current_y_offset += label_spacing;  // Keep this line from the previous layout logic
-            panel_rate = lv_obj_create(scr);
+            panel_rate = lv_obj_create(main_scr);
             lv_obj_set_size(panel_rate, 250, 100);
             lv_obj_set_style_bg_color(panel_rate, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_rate, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -193,7 +206,7 @@
 
             // Total area sown
             current_y_offset += label_spacing;  // Keep this line
-            panel_area = lv_obj_create(scr);
+            panel_area = lv_obj_create(main_scr);
             lv_obj_set_size(panel_area, 250, 100);
             lv_obj_set_style_bg_color(panel_area, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_bg_opa(panel_area, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -213,7 +226,7 @@
             lv_obj_center(area_label);  // Center label within the panel
 
             // Create a box/container (object)
-            drill_box = lv_obj_create(scr);
+            drill_box = lv_obj_create(main_scr);
             lv_obj_set_size(drill_box, 180, 110);
             lv_obj_set_style_pad_all(drill_box, 9, 0);
             lv_obj_set_style_border_width(drill_box, 3, 0);
@@ -234,9 +247,9 @@
 
 
             // Alarm indicator
-            //alarm_box = lv_label_create(scr); // Declaration moved to global
+            //alarm_box = lv_label_create(main_scr); // Declaration moved to global
             //current_y_offset += label_spacing;
-            alarm_btn = lv_btn_create(scr);
+            alarm_btn = lv_btn_create(main_scr);
             lv_obj_set_width(alarm_btn, 160);
             lv_obj_set_height(alarm_btn, 90);
             lv_obj_set_style_pad_all(alarm_btn, 10, 0);
@@ -261,7 +274,7 @@ lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_18, LV_PART_MAIN | L
 lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 
 
-       spinner = lv_spinner_create(scr, 750, 40); // arc length 60, spin time 1000ms
+       spinner = lv_spinner_create(main_scr, 750, 40); // arc length 60, spin time 1000ms
                 lv_obj_set_size(spinner, 135, 135);
                 lv_obj_align(spinner, LV_ALIGN_CENTER, -20, -160); // LV_ALIGN_CENTER  LV_ALIGN_RIGHT_MID  LV_ALIGN_LEFT_MID
                                                                 //  ( X ,Y ) =  X = left - or right +   Y = up - or down +
@@ -364,6 +377,38 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
                     // Text color is now fixed to white in setup
                 }
                 }
+// --- Settings Button ---
+    settings_btn = lv_btn_create(main_scr);
+    lv_obj_set_width(settings_btn, 160);
+    lv_obj_set_height(settings_btn, 90);
+    lv_obj_set_style_pad_all(settings_btn, 10, 0);
+    lv_obj_set_style_border_width(settings_btn, 3, 0);
+    lv_obj_set_style_border_color(settings_btn, lv_color_white(), 0);
+    lv_obj_set_style_border_opa(settings_btn, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(settings_btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(settings_btn, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(settings_btn, LV_OPA_COVER, 0);
+    lv_obj_align(settings_btn, LV_ALIGN_TOP_RIGHT, -70, 20);
+
+    lv_obj_t *settings_label = lv_label_create(settings_btn);
+    lv_label_set_text(settings_label, "SETTINGS");
+    lv_obj_set_style_text_align(settings_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(settings_label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    lv_obj_add_event_cb(settings_btn, show_settings_page, LV_EVENT_CLICKED, NULL);
+
+    // --- Backlight Slider ---
+    backlight_slider = lv_slider_create(main_scr);
+    lv_obj_set_width(backlight_slider, 250);
+    lv_obj_align(backlight_slider, LV_ALIGN_BOTTOM_MID, 0, -30);
+    lv_slider_set_range(backlight_slider, 0, 100);
+    lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF);
+
+    lv_obj_t *slider_label = lv_label_create(main_scr);
+    lv_label_set_text(slider_label, "Backlight");
+    lv_obj_align_to(slider_label, backlight_slider, LV_ALIGN_OUT_TOP_MID, 0, -5);
+
+    lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
                 lvgl_port_unlock();                     // Unlock LVGL access
                 Serial.println("Widget data toggled");  // For debugging
@@ -399,7 +444,7 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
 
             void start_warning_flash() {
             if (!warn_label) {
-                warn_label = lv_label_create(lv_scr_act());
+                warn_label = lv_label_create(lv_main_scr_act());
                 lv_label_set_text(warn_label, "WARNING!");
                 lv_obj_set_style_text_color(warn_label, lv_palette_main(LV_PALETTE_RED), 0);
                 lv_obj_set_style_text_font(warn_label, &lv_font_montserrat_42, 0);  // Larger font (optional)
@@ -425,3 +470,45 @@ lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
                 lv_label_set_text(warn_label, "SAFE");                                          // Or clear text: lv_label_set_text(warn_label, "");
             }
             }
+// Show main page
+void show_main_page() {
+    lv_scr_load(main_scr);
+}
+
+// Settings page event
+void show_settings_page(lv_event_t * e) {
+    if (!settings_scr) {
+        settings_scr = lv_obj_create(NULL); // New blank screen
+
+        // Add a label
+        lv_obj_t *label = lv_label_create(settings_scr);
+        lv_label_set_text(label, "Settings Page");
+        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
+
+        // Add a back button to return to main page
+        lv_obj_t *back_btn = lv_btn_create(settings_scr);
+        lv_obj_set_width(back_btn, 120);
+        lv_obj_set_height(back_btn, 60);
+        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_MID, 0, -40);
+        lv_obj_t *back_label = lv_label_create(back_btn);
+        lv_label_set_text(back_label, "BACK");
+        lv_obj_center(back_label);
+        lv_obj_add_event_cb(back_btn, [](lv_event_t *e) {
+            show_main_page();
+        }, LV_EVENT_CLICKED, NULL);
+
+        // (You may add more settings widgets here as needed)
+    }
+    lv_scr_load(settings_scr);
+}
+
+// Backlight slider callback
+void backlight_slider_event_cb(lv_event_t *e) {
+    lv_obj_t *slider = lv_event_get_target(e);
+    int percent = lv_slider_get_value(slider);
+
+    if (g_board) {
+        auto backlight = g_board->getBacklight();
+        if (backlight) backlight->setBrightness(percent); // 0 = off, 100 = full
+    }
+}
