@@ -10,6 +10,7 @@
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
 #include "color.h"
+#include "esp_panel_board_custom_conf.h"
 
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
@@ -22,6 +23,12 @@ Board *board = nullptr; // Global variable
 
 // Buffers to hold formatted strings
 char speedBuf[16], rateBuf[16], areaBuf[16];
+
+
+#define BACKLIGHT_CHANNEL   0
+#define BACKLIGHT_FREQ      5000
+#define BACKLIGHT_RES       8    // 8-bit: brightness from 0 to 255
+
 
 // Forward declarations for LVGL callback functions
 void backlight_slider_event_cb(lv_event_t *e);
@@ -89,6 +96,13 @@ void show_settings_page(lv_event_t *e = nullptr); // Accept null for direct call
 
 void setup() {
     Serial.begin(115200);
+
+// PWM backlight control
+    ledcSetup(BACKLIGHT_CHANNEL, BACKLIGHT_FREQ, BACKLIGHT_RES);
+    ledcAttachPin(BACKLIGHT_PIN, BACKLIGHT_CHANNEL);
+
+    // Set brightness (0 = off, 255 = full brightness)
+    ledcWrite(BACKLIGHT_CHANNEL, 255);  // Example: 78% brightness
 
     Serial.println("Initializing board");
     board = new Board();
