@@ -385,6 +385,7 @@ void show_main_page() {
 }
 
 // Settings page now contains alarm button and backlight slider/label
+/*
 void show_settings_page(lv_event_t *e) {
     if (!settings_scr) {
         settings_scr = lv_obj_create(NULL);
@@ -440,36 +441,50 @@ lv_obj_align(debug_label, LV_ALIGN_TOP_MID, 0, 200);
     }
     lv_scr_load(settings_scr);
 }
-
-void backlight_slider_event_cb(lv_event_t *e) {
-    // Get the slider value (0–100)
+*/
+ void backlight_slider_event_cb(lv_event_t *e) {
+    // 1. Get the slider value (0–100)
     int percent = lv_slider_get_value(lv_event_get_target(e));
+    if (percent < 10) percent = 10; // Prevent full blackout
 
-    // Update the debug label on the screen to show the value
-    if (debug_label) {
+    // 2. Debug: Show the raw slider value
+    if (debug_label_1) {
         char buf[32];
         snprintf(buf, sizeof(buf), "Slider Value: %d", percent);
-        lv_label_set_text(debug_label, buf);
+        lv_label_set_text(debug_label_1, buf);
     }
 
-    // Clamp value to prevent a total blackout
-    if (percent < 10) percent = 10;
+    // 3. Map slider value to PWM value (0-255 or 0-1023 depending on your hardware)
+    int pwmValue = map(percent, 0, 100, 0, 255); // Change 255 to 1023 if needed
+    if (debug_label_2) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "PWM Value: %d", pwmValue);
+        lv_label_set_text(debug_label_2, buf);
+    }
 
-    // Set backlight brightness if board and backlight are valid
-    if (board) {
-        auto backlight = board->getBacklight();
-        if (backlight) {
-            int pwmValue = map(percent, 0, 100, 0, 255); // Map to 0–255 for PWM
-            backlight->setBrightness(pwmValue);
+    // 4. Check board pointer validity
+    if (debug_label_3) {
+        if (board) {
+            lv_label_set_text(debug_label_3, "Board: OK");
+        } else {
+            lv_label_set_text(debug_label_3, "Board: NULL");
         }
     }
 
-    // (Optional) Serial prints – will probably NOT work in this callback context on ESP32
-    // lv_event_code_t code = lv_event_get_code(e);
-    // Serial.print("Slider event code: ");
-    // Serial.println(code);
-    // Serial.print("Slider value: ");
-    // Serial.println(percent);
+    // 5. Check backlight pointer validity
+    auto backlight = board ? board->getBacklight() : nullptr;
+    if (debug_label_4) {
+        if (backlight) {
+            lv_label_set_text(debug_label_4, "Backlight: OK");
+        } else {
+            lv_label_set_text(debug_label_4, "Backlight: NULL");
+        }
+    }
+
+    // 6. Actually set the backlight if all is valid
+    if (backlight) {
+        backlight->setBrightness(pwmValue);
+    }
 }
 // --- Debug Screen Implementation ---
 void show_debug_screen() {
