@@ -1,6 +1,9 @@
 /**
 * display for agro drill lcd using waveshare SKU 27078 7" inch esp lcd
+* 
+* Version with "Push to Clear Alarms" button and Backlight slider/label moved to the Settings screen.
 */
+
 #define LV_CONF_INCLUDE_SIMPLE  // place before lvgl.h
 #include <Arduino.h>
 #include <esp_display_panel.hpp>
@@ -25,54 +28,64 @@ void backlight_slider_event_cb(lv_event_t *e);
 void show_main_page();
 void show_settings_page(lv_event_t *e);
 void alarm_ack_callback(lv_event_t *e);
+void test_btn_cb(lv_event_t *e);
 
-// Global UI objects
-lv_obj_t *backlight_slider = nullptr;
+// Add a global label for debugging
+lv_obj_t *debug_label = nullptr;
+
 lv_obj_t *main_scr = nullptr;
 lv_obj_t *settings_scr = nullptr;
 lv_obj_t *settings_btn = nullptr;
-
-// Bin level bars
-static lv_obj_t *bin_left = NULL;
-static lv_obj_t *lbl_bin_left_name = NULL;
-static lv_obj_t *bin_right = NULL;
-static lv_obj_t *lbl_bin_right_name = NULL;
-
-// Data labels
-static lv_obj_t *speed_label = NULL;
-static lv_obj_t *rate_label = NULL;
-static lv_obj_t *area_label = NULL;
-
-// Alarm and status
+lv_obj_t *backlight_slider = nullptr;
 lv_obj_t *alarm_btn = nullptr;
 
-// Drill position widget
-static lv_obj_t *drill_box = NULL;
-static lv_obj_t *drill_label = NULL;
-void drill_box_anim_cb(void *obj, int32_t v) {
-    lv_obj_set_style_bg_opa((lv_obj_t *)obj, v, 0);  // Animate opacity
-}
+lv_obj_t *bin_left = nullptr;
+lv_obj_t *lbl_bin_left_name = nullptr;
+lv_obj_t *bin_right = nullptr;
+lv_obj_t *lbl_bin_right_name = nullptr;
 
-// Spinner arc
-static lv_obj_t *spinner = nullptr;
+lv_obj_t *speed_label = nullptr;
+lv_obj_t *rate_label = nullptr;
+lv_obj_t *area_label = nullptr;
 
-// Panels for grouping speed, rate, area
-static lv_obj_t *panel_speed = NULL;
-static lv_obj_t *panel_rate = NULL;
-static lv_obj_t *panel_area = NULL;
+lv_obj_t *drill_box = nullptr;
+lv_obj_t *drill_label = nullptr;
+lv_obj_t *spinner = nullptr;
+lv_obj_t *panel_speed = nullptr;
+lv_obj_t *panel_rate = nullptr;
+lv_obj_t *panel_area = nullptr;
 
-// Warning label and timer
-lv_obj_t *warn_label = NULL;
-lv_timer_t *warn_flash_timer = NULL;
+lv_obj_t *warn_label = nullptr;
+lv_timer_t *warn_flash_timer = nullptr;
 
-// Test mode toggle
-static bool test_mode_toggle_state = false;
-static unsigned long last_toggle_time = 0;
+// --- Add global debug label pointers and screen ---
+lv_obj_t *debug_screen = nullptr;
+//lv_obj_t *debug_label = nullptr; // For legacy compatibility
+lv_obj_t *debug_label_1 = nullptr;
+lv_obj_t *debug_label_2 = nullptr;
+lv_obj_t *debug_label_3 = nullptr;
+lv_obj_t *debug_label_4 = nullptr;
+
+bool test_mode_toggle_state = false;
+unsigned long last_toggle_time = 0;
 const unsigned long toggle_interval = 8000;  // 8 seconds
 
 float currentSpeed = 0;
 float currentRate = 2;
 float totalArea = 0;
+
+void drill_box_anim_cb(void *obj, int32_t v) {
+    lv_obj_set_style_bg_opa((lv_obj_t *)obj, v, 0);  // Animate opacity
+}
+
+void test_btn_cb(lv_event_t *e) {
+    if (debug_label) {
+        lv_label_set_text(debug_label, "Test button pressed!");
+    }
+}
+
+void show_debug_screen();
+void show_settings_page(lv_event_t *e = nullptr); // Accept null for direct call
 
 void setup() {
     Serial.begin(115200);
@@ -98,12 +111,10 @@ void setup() {
     Serial.println("Creating UI");
     lvgl_port_lock(-1);
 
+    // MAIN SCREEN
     main_scr = lv_scr_act();
-
-    // Set black background
     lv_obj_set_style_bg_color(main_scr, lv_color_black(), 0);
 
-    // Bin level bars
     bin_left = lv_bar_create(main_scr);
     lv_obj_set_size(bin_left, 80, 390);
     lv_obj_align(bin_left, LV_ALIGN_LEFT_MID, 30, 0);
@@ -138,7 +149,6 @@ void setup() {
     int label_spacing = 110;
     int x_offset = -20;
 
-    // Ground speed panel
     panel_speed = lv_obj_create(main_scr);
     lv_obj_set_size(panel_speed, 250, 100);
     lv_obj_set_style_bg_color(panel_speed, COLOR_TEAL, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -155,7 +165,6 @@ void setup() {
     lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_28, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(speed_label);
 
-    // Seeding rate panel
     current_y_offset += label_spacing;
     panel_rate = lv_obj_create(main_scr);
     lv_obj_set_size(panel_rate, 250, 100);
@@ -173,7 +182,6 @@ void setup() {
     lv_obj_set_style_text_font(rate_label, &lv_font_montserrat_30, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(rate_label);
 
-    // Total area panel
     current_y_offset += label_spacing;
     panel_area = lv_obj_create(main_scr);
     lv_obj_set_size(panel_area, 250, 100);
@@ -191,7 +199,6 @@ void setup() {
     lv_obj_set_style_text_font(area_label, &lv_font_montserrat_32, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(area_label);
 
-    // Drill position box
     drill_box = lv_obj_create(main_scr);
     lv_obj_set_size(drill_box, 180, 110);
     lv_obj_set_style_pad_all(drill_box, 9, 0);
@@ -207,27 +214,6 @@ void setup() {
     lv_obj_set_style_text_align(drill_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_center(drill_label);
 
-    // Alarm button
-    alarm_btn = lv_btn_create(main_scr);
-    lv_obj_set_width(alarm_btn, 160);
-    lv_obj_set_height(alarm_btn, 90);
-    lv_obj_set_style_pad_all(alarm_btn, 10, 0);
-    lv_obj_set_style_border_width(alarm_btn, 3, 0);
-    lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
-    lv_obj_set_style_border_opa(alarm_btn, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(alarm_btn, CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
-    lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT, -70, 20);
-
-    // Alarm button label
-    lv_obj_t *alarm_label = lv_label_create(alarm_btn);
-    lv_label_set_text(alarm_label, "PUSH TO\nCLEAR ALARM");
-    lv_obj_set_style_text_align(alarm_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
-
     // Spinner
     spinner = lv_spinner_create(main_scr, 750, 40);
     lv_obj_set_size(spinner, 135, 135);
@@ -236,7 +222,6 @@ void setup() {
     lv_obj_set_style_arc_width(spinner, 20, LV_PART_INDICATOR);
     lv_obj_set_style_arc_width(spinner, 19, LV_PART_MAIN);
 
-    // Spinner label
     lv_obj_t *spinner_label = lv_label_create(spinner);
     lv_label_set_text(spinner_label, "CLUTCH\nENGAGED");
     lv_obj_set_style_text_align(spinner_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -254,7 +239,7 @@ void setup() {
     lv_obj_set_style_bg_color(settings_btn, lv_palette_main(LV_PALETTE_BLUE), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(settings_btn, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(settings_btn, LV_OPA_COVER, 0);
-    lv_obj_align(settings_btn, LV_ALIGN_TOP_RIGHT, -70, 120);
+    lv_obj_align(settings_btn, LV_ALIGN_TOP_RIGHT, -70, 20);
 
     lv_obj_t *settings_label = lv_label_create(settings_btn);
     lv_label_set_text(settings_label, "SETTINGS");
@@ -263,26 +248,21 @@ void setup() {
 
     lv_obj_add_event_cb(settings_btn, show_settings_page, LV_EVENT_CLICKED, NULL);
 
-    // --- Backlight Slider ---
-    backlight_slider = lv_slider_create(main_scr);
-    lv_obj_set_width(backlight_slider, 250);
-    lv_obj_align(backlight_slider, LV_ALIGN_BOTTOM_MID, 0, -30);
-    lv_slider_set_range(backlight_slider, 0, 100);
-    lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF);
-
-    lv_obj_t *slider_label = lv_label_create(main_scr);
-    lv_label_set_text(slider_label, "Backlight");
-    lv_obj_align_to(slider_label, backlight_slider, LV_ALIGN_OUT_TOP_MID, 0, -5);
-
-    lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    // Add a test button to check touch
+    lv_obj_t *test_btn = lv_btn_create(main_scr);
+    lv_obj_align(test_btn, LV_ALIGN_CENTER, 0, 20);
+    lv_obj_t *lbl = lv_label_create(test_btn);
+    lv_label_set_text(lbl, "TEST TOUCH");
+    lv_obj_add_event_cb(test_btn, test_btn_cb, LV_EVENT_ALL, NULL);
 
     lvgl_port_unlock();
 
     start_warning_flash();
+
+    Serial.println("setup() complete");
 }
 
 void loop() {
-    // LVGL task handler
     lv_timer_handler();
     delay(5);
 
@@ -376,7 +356,7 @@ void start_warning_flash() {
         lv_label_set_text(warn_label, "WARNING!");
         lv_obj_set_style_text_color(warn_label, lv_palette_main(LV_PALETTE_RED), 0);
         lv_obj_set_style_text_font(warn_label, &lv_font_montserrat_42, 0);
-        lv_obj_align(warn_label, LV_ALIGN_CENTER, -20, -10);
+        lv_obj_align(warn_label, LV_ALIGN_CENTER, -20, -60);
     } else {
         lv_label_set_text(warn_label, "WARNING!");
         lv_obj_clear_flag(warn_label, LV_OBJ_FLAG_HIDDEN);
@@ -389,7 +369,7 @@ void start_warning_flash() {
 void stop_warning_flash() {
     if (warn_flash_timer) {
         lv_timer_del(warn_flash_timer);
-        warn_flash_timer = NULL;
+        warn_flash_timer = nullptr;
     }
     if (warn_label) {
         lv_obj_clear_flag(warn_label, LV_OBJ_FLAG_HIDDEN);
@@ -404,17 +384,53 @@ void show_main_page() {
     }
 }
 
+// Settings page now contains alarm button and backlight slider/label
 void show_settings_page(lv_event_t *e) {
     if (!settings_scr) {
         settings_scr = lv_obj_create(NULL);
         lv_obj_t *label = lv_label_create(settings_scr);
         lv_label_set_text(label, "Settings Page");
         lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
+debug_label = lv_label_create(settings_scr);
+lv_label_set_text(debug_label, "DEBUG LABEL");
+lv_obj_align(debug_label, LV_ALIGN_TOP_MID, 0, 200);
+        // Move "Push to Clear Alarm" button to settings page
+        alarm_btn = lv_btn_create(settings_scr);
+        lv_obj_set_width(alarm_btn, 160);
+        lv_obj_set_height(alarm_btn, 90);
+        lv_obj_set_style_pad_all(alarm_btn, 10, 0);
+        lv_obj_set_style_border_width(alarm_btn, 3, 0);
+        lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
+        lv_obj_set_style_border_opa(alarm_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(alarm_btn, CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
+        lv_obj_align(alarm_btn, LV_ALIGN_TOP_MID, -150, 20);
 
+        lv_obj_t *alarm_label = lv_label_create(alarm_btn);
+        lv_label_set_text(alarm_label, "PUSH TO\nCLEAR ALARM");
+        lv_obj_set_style_text_align(alarm_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
+
+        // Move backlight slider and label to settings page
+        backlight_slider = lv_slider_create(settings_scr);
+        lv_obj_set_width(backlight_slider, 250);
+        lv_obj_align(backlight_slider, LV_ALIGN_BOTTOM_MID, 0, -30);
+        lv_slider_set_range(backlight_slider, 0, 100);
+        lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF);
+
+        lv_obj_t *slider_label = lv_label_create(settings_scr);
+        lv_label_set_text(slider_label, "Backlight");
+        lv_obj_align_to(slider_label, backlight_slider, LV_ALIGN_OUT_TOP_MID, 0, -5);
+
+        lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_ALL, NULL);
+
+        // Add a back button
         lv_obj_t *back_btn = lv_btn_create(settings_scr);
         lv_obj_set_width(back_btn, 120);
         lv_obj_set_height(back_btn, 60);
-        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_MID, 0, -40);
+        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_MID, 0, -90);
         lv_obj_t *back_label = lv_label_create(back_btn);
         lv_label_set_text(back_label, "BACK");
         lv_obj_center(back_label);
@@ -425,14 +441,143 @@ void show_settings_page(lv_event_t *e) {
     lv_scr_load(settings_scr);
 }
 
-// Backlight slider callback
 void backlight_slider_event_cb(lv_event_t *e) {
-    lv_obj_t *slider = lv_event_get_target(e);
-    int percent = lv_slider_get_value(slider);
- Serial.print("Slider moved, new percent: ");
-    Serial.println(percent);
+    // Get the slider value (0–100)
+    int percent = lv_slider_get_value(lv_event_get_target(e));
+
+    // Update the debug label on the screen to show the value
+    if (debug_label) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Slider Value: %d", percent);
+        lv_label_set_text(debug_label, buf);
+    }
+
+    // Clamp value to prevent a total blackout
+    if (percent < 10) percent = 10;
+
+    // Set backlight brightness if board and backlight are valid
     if (board) {
         auto backlight = board->getBacklight();
-        if (backlight) backlight->setBrightness(percent);
+        if (backlight) {
+            int pwmValue = map(percent, 0, 100, 0, 255); // Map to 0–255 for PWM
+            backlight->setBrightness(pwmValue);
+        }
     }
+
+    // (Optional) Serial prints – will probably NOT work in this callback context on ESP32
+    // lv_event_code_t code = lv_event_get_code(e);
+    // Serial.print("Slider event code: ");
+    // Serial.println(code);
+    // Serial.print("Slider value: ");
+    // Serial.println(percent);
+}
+// --- Debug Screen Implementation ---
+void show_debug_screen() {
+    if (!debug_screen) {
+        debug_screen = lv_obj_create(NULL);
+
+        lv_obj_t *title = lv_label_create(debug_screen);
+        lv_label_set_text(title, "Debug Information");
+        lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
+        lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 16);
+
+        debug_label_1 = lv_label_create(debug_screen);
+        lv_label_set_text(debug_label_1, "Label 1: ");
+        lv_obj_align(debug_label_1, LV_ALIGN_TOP_LEFT, 16, 60);
+
+        debug_label_2 = lv_label_create(debug_screen);
+        lv_label_set_text(debug_label_2, "Label 2: ");
+        lv_obj_align(debug_label_2, LV_ALIGN_TOP_LEFT, 16, 100);
+
+        debug_label_3 = lv_label_create(debug_screen);
+        lv_label_set_text(debug_label_3, "Label 3: ");
+        lv_obj_align(debug_label_3, LV_ALIGN_TOP_LEFT, 16, 140);
+
+        debug_label_4 = lv_label_create(debug_screen);
+        lv_label_set_text(debug_label_4, "Label 4: ");
+        lv_obj_align(debug_label_4, LV_ALIGN_TOP_LEFT, 16, 180);
+
+        // Add a button to return to settings page
+        lv_obj_t *back_btn = lv_btn_create(debug_screen);
+        lv_obj_set_width(back_btn, 160);
+        lv_obj_set_height(back_btn, 60);
+        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_MID, 0, -20);
+        lv_obj_t *back_label = lv_label_create(back_btn);
+        lv_label_set_text(back_label, "BACK TO SETTINGS");
+        lv_obj_center(back_label);
+        lv_obj_add_event_cb(back_btn, [](lv_event_t *e) {
+            show_settings_page();
+        }, LV_EVENT_CLICKED, NULL);
+    }
+    lv_scr_load(debug_screen);
+}
+
+// Modify show_settings_page to add button for debug screen
+void show_settings_page(lv_event_t *e) {
+    if (!settings_scr) {
+        settings_scr = lv_obj_create(NULL);
+        lv_obj_t *label = lv_label_create(settings_scr);
+        lv_label_set_text(label, "Settings Page");
+        lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
+
+        // "Push to Clear Alarm" button (existing)
+        alarm_btn = lv_btn_create(settings_scr);
+        lv_obj_set_width(alarm_btn, 160);
+        lv_obj_set_height(alarm_btn, 90);
+        lv_obj_set_style_pad_all(alarm_btn, 10, 0);
+        lv_obj_set_style_border_width(alarm_btn, 3, 0);
+        lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
+        lv_obj_set_style_border_opa(alarm_btn, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(alarm_btn, CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
+        lv_obj_align(alarm_btn, LV_ALIGN_TOP_MID, 0, 120);
+
+        lv_obj_t *alarm_label = lv_label_create(alarm_btn);
+        lv_label_set_text(alarm_label, "PUSH TO\nCLEAR ALARM");
+        lv_obj_set_style_text_align(alarm_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
+
+        // Backlight slider and label (existing)
+        backlight_slider = lv_slider_create(settings_scr);
+        lv_obj_set_width(backlight_slider, 250);
+        lv_obj_align(backlight_slider, LV_ALIGN_BOTTOM_MID, 0, -80);
+        lv_slider_set_range(backlight_slider, 0, 100);
+        lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF);
+
+        lv_obj_t *slider_label = lv_label_create(settings_scr);
+        lv_label_set_text(slider_label, "Backlight");
+        lv_obj_align_to(slider_label, backlight_slider, LV_ALIGN_OUT_TOP_MID, 0, -5);
+
+        lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_ALL, NULL);
+
+        // Button to show Debug Screen
+        lv_obj_t *debug_btn = lv_btn_create(settings_scr);
+        lv_obj_set_width(debug_btn, 160);
+        lv_obj_set_height(debug_btn, 60);
+        lv_obj_align(debug_btn, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_t *debug_btn_label = lv_label_create(debug_btn);
+        lv_label_set_text(debug_btn_label, "SHOW DEBUG");
+        lv_obj_center(debug_btn_label);
+        lv_obj_add_event_cb(debug_btn, [](lv_event_t *e) {
+            show_debug_screen();
+        }, LV_EVENT_CLICKED, NULL);
+
+        // Back button to return to main screen
+        lv_obj_t *back_btn = lv_btn_create(settings_scr);
+        lv_obj_set_width(back_btn, 120);
+        lv_obj_set_height(back_btn, 60);
+        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_LEFT, 20, -10);
+        lv_obj_t *back_label = lv_label_create(back_btn);
+        lv_label_set_text(back_label, "BACK");
+        lv_obj_center(back_label);
+        lv_obj_add_event_cb(back_btn, [](lv_event_t *e) {
+            show_main_page();
+        }, LV_EVENT_CLICKED, NULL);
+
+        // Optionally, assign debug_label for backward compatibility
+        debug_label = debug_label_1;
+    }
+    lv_scr_load(settings_scr);
 }
