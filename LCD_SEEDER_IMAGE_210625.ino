@@ -9,8 +9,8 @@
 #include <esp_display_panel.hpp>
 #include <lvgl.h>
 #include "lvgl_v8_port.h"
-#include "color.h"
-#include "esp_panel_board_custom_conf.h"
+#include "color.h
+//#include "esp_panel_board_custom_conf.h"
 
 using namespace esp_panel::drivers;
 using namespace esp_panel::board;
@@ -97,12 +97,6 @@ void show_settings_page(lv_event_t *e = nullptr); // Accept null for direct call
 void setup() {
     Serial.begin(115200);
 
-// PWM backlight control
-    ledcSetup(BACKLIGHT_CHANNEL, BACKLIGHT_FREQ, BACKLIGHT_RES);
-    ledcAttachPin(BACKLIGHT_PIN, BACKLIGHT_CHANNEL);
-
-    // Set brightness (0 = off, 255 = full brightness)
-    ledcWrite(BACKLIGHT_CHANNEL, 255);  // Example: 78% brightness
 
     Serial.println("Initializing board");
     board = new Board();
@@ -459,7 +453,7 @@ lv_obj_align(debug_label, LV_ALIGN_TOP_MID, 0, 200);
  void backlight_slider_event_cb(lv_event_t *e) {
     // 1. Get the slider value (0–100)
     int percent = lv_slider_get_value(lv_event_get_target(e));
-    if (percent < 10) percent = 10; // Prevent full blackout
+   if (percent < 5) percent = 5; // Prevent full blackout
 
     // 2. Debug: Show the raw slider value
     if (debug_label_1) {
@@ -469,7 +463,7 @@ lv_obj_align(debug_label, LV_ALIGN_TOP_MID, 0, 200);
     }
 
     // 3. Map slider value to PWM value (0-255 or 0-1023 depending on your hardware)
-    int pwmValue = map(percent, 0, 100, 0, 255); // Change 255 to 1023 if needed
+    int pwmValue = map(percent, 0, 100, 0, 80); // Change 255 to 1023 if needed
     if (debug_label_2) {
         char buf[32];
         snprintf(buf, sizeof(buf), "PWM Value: %d", pwmValue);

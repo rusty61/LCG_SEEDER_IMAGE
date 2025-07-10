@@ -104,7 +104,7 @@
  * |   0   |   1   |                 Yes                 |              No            |
  * |   1   |   1   |                 Yes                 |              Yes           |
  */
-#define ESP_PANEL_DRIVERS_LCD_COMPILE_UNUSED_DRIVERS    (1)
+#define ESP_PANEL_DRIVERS_LCD_COMPILE_UNUSED_DRIVERS    (0)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////// Touch Configurations /////////////////////////////////////////////////
@@ -154,7 +154,7 @@
  * |   0   |   1   |                 Yes                 |              No            |
  * |   1   |   1   |                 Yes                 |              Yes           |
  */
-#define ESP_PANEL_DRIVERS_TOUCH_COMPILE_UNUSED_DRIVERS          (1)
+#define ESP_PANEL_DRIVERS_TOUCH_COMPILE_UNUSED_DRIVERS          (0)
 
 #if ESP_PANEL_DRIVERS_TOUCH_USE_XPT2046 || ESP_PANEL_DRIVERS_TOUCH_COMPILE_UNUSED_DRIVERS
 /**
@@ -205,9 +205,9 @@
  * Enable or disable IO Expander drivers used in the factory class. Disable to reduce code size.
  * Set to `1` to enable, `0` to disable.
  */
-#define ESP_PANEL_DRIVERS_EXPANDER_USE_ALL                      (1)
+#define ESP_PANEL_DRIVERS_EXPANDER_USE_ALL                      (0)
 #if !ESP_PANEL_DRIVERS_EXPANDER_USE_ALL
-    #define ESP_PANEL_DRIVERS_EXPANDER_USE_CH422G               (0)
+    #define ESP_PANEL_DRIVERS_EXPANDER_USE_CH422G               (1)
     #define ESP_PANEL_DRIVERS_EXPANDER_USE_HT8574               (0)
     #define ESP_PANEL_DRIVERS_EXPANDER_USE_TCA95XX_8BIT         (0)
     #define ESP_PANEL_DRIVERS_EXPANDER_USE_TCA95XX_16BIT        (0)
@@ -228,7 +228,9 @@
     #define ESP_PANEL_DRIVERS_BACKLIGHT_USE_SWITCH_EXPANDER     (0)
     #define ESP_PANEL_DRIVERS_BACKLIGHT_USE_PWM_LEDC            (1)
     #define ESP_PANEL_DRIVERS_BACKLIGHT_USE_CUSTOM              (0)
-#endif // ESP_PANEL_DRIVERS_BACKLIGHT_USE_ALL
+#endif // ESP_PANEL_DRIVERS_BACKLIGHT_USE_ALLesp_panel_driver conflict with the 
+
+
 
 /**
  * @brief Controls compilation of unused backlight drivers
@@ -247,7 +249,7 @@
  * |   0   |   1   |                 Yes                 |              No            |
  * |   1   |   1   |                 Yes                 |              Yes           |
  */
-#define ESP_PANEL_DRIVERS_BACKLIGHT_COMPILE_UNUSED_DRIVERS     (1)
+#define ESP_PANEL_DRIVERS_BACKLIGHT_COMPILE_UNUSED_DRIVERS     (0)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////// File Version ///////////////////////////////////////////////////////////
