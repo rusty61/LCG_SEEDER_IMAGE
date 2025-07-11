@@ -11,7 +11,9 @@
             #include "lvgl_v8_port.h"
             #include "color.h"
             #include "esp_panel_board_custom_conf.h"
+            #include "alarm_buttons.h" // Added for new alarm buttons
 
+            
             using namespace esp_panel::drivers;
             using namespace esp_panel::board;
 
@@ -75,6 +77,12 @@
             lv_obj_t *debug_label_3 = nullptr;
             lv_obj_t *debug_label_4 = nullptr;
 
+             // --- Signal Strength Indicator Globals ---
+             #define MAX_SIGNAL_BARS 5
+             lv_obj_t *signal_bars[MAX_SIGNAL_BARS]; // Array to hold the bar objects for settings screen
+             lv_obj_t *signal_container_settings;   // Container for the signal bars on settings screen
+              // --- End Signal Strength Indicator Globals ---
+
             bool test_mode_toggle_state = false;
             unsigned long last_toggle_time = 0;
             const unsigned long toggle_interval = 8000;  // 8 seconds
@@ -82,6 +90,7 @@
             float currentSpeed = 0;
             float currentRate = 2;
             float totalArea = 0;
+             static int current_test_signal_level = 0;
 
             void drill_box_anim_cb(void *obj, int32_t v) {
             lv_obj_set_style_bg_opa((lv_obj_t *)obj, v, 0);  // Animate opacity
@@ -329,7 +338,24 @@
                     lv_obj_set_style_bg_opa(drill_box, LV_OPA_COVER, 0);
                 }
                 }
+                 // --- Update Signal Strength Display ---
+        // We'll make the signal strength cycle each time this block runs.
+        // MAX_SIGNAL_BARS is 5, so levels are 0, 1, 2, 3, 4, 5.
+        // (MAX_SIGNAL_BARS + 1) gives the number of states (0 to 5 inclusive is 6 states).
+        
+        if (lv_scr_act() == settings_scr) { // Only update if settings screen is active
+            update_signal_strength_display_settings(current_test_signal_level);
+            Serial.printf("Loop Test: Setting signal strength to %d", current_test_signal_level);
+
+        }
+        
+        current_test_signal_level++;
+        if (current_test_signal_level > MAX_SIGNAL_BARS) { // If it goes beyond 5 (0-5 are valid levels)
+            current_test_signal_level = 0; // Reset to 0
+        }
+        // --- End Update Signal Strength Display ---
                 lvgl_port_unlock();
+                
             }
             }
 
@@ -337,11 +363,11 @@
             lv_obj_t *btn = lv_event_get_target(e);
             lv_obj_t *label = lv_obj_get_child(btn, 0);
 
-            lv_label_set_text(label, "ALARM\nACKNOWLEDGED");
+            lv_label_set_text(label, "SEED\nACKNOWLEDGED");
             lv_obj_set_style_bg_color(btn, lv_palette_main(LV_PALETTE_GREEN), 0);
             lv_obj_set_style_text_font(btn, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
             lv_obj_set_style_text_align(btn, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-            lv_obj_set_style_text_color(btn, lv_color_white(), 0);
+            lv_obj_set_style_text_color(btn, lv_color_black(), 0);
 
             stop_warning_flash();
             }
@@ -390,129 +416,221 @@
             }
 
 
-           void backlight_slider_event_cb(lv_event_t *e) {
-    lv_obj_t *slider = lv_event_get_target(e);
-    int percent = lv_slider_get_value(slider);
-    if (percent < 5) percent = 5;
+// Function 1: backlight_slider_event_cb (Modified with lv_obj_align_to)
+void backlight_slider_event_cb(lv_event_t *e) {
+    Serial.println("DEBUG: backlight_slider_event_cb CALLED!");
 
-    // Set backlight brightness (adjust if needed)
-    int pwmValue = map(percent, 0, 100, 0, 80);
+    lv_obj_t *slider = lv_event_get_target(e);
+    if (!slider) {
+        Serial.println("DEBUG: Slider event CB - slider is NULL!");
+        return;
+    }
+
+    int percent_val = lv_slider_get_value(slider);
+    int display_percent = percent_val;
+
+    int pwm_percent = percent_val;
+    if (pwm_percent < 5) pwm_percent = 5;
+
+    int pwmValue = map(pwm_percent, 0, 100, 0, 80);
     if (board) {
         auto backlight = board->getBacklight();
         if (backlight) {
             backlight->setBrightness(pwmValue);
         }
     }
-    //backlight->setBrightness(pwmValue);
 
-    // Update value label text
-    lv_label_set_text_fmt(backlight_slider_value_label, "%d", percent);
-
-    // Track knob position (estimate)
-    int slider_height = lv_obj_get_height(slider);
-    lv_coord_t knob_y = lv_obj_get_y(slider) + ((100 - percent) * slider_height) / 100;
-    lv_coord_t label_x = lv_obj_get_x(slider) + lv_obj_get_width(slider) + 10;
-    lv_obj_set_pos(backlight_slider_value_label, label_x, knob_y);
-
-
-    // Update live value label
     if (backlight_slider_value_label) {
-        static char buf[8];
-        snprintf(buf, sizeof(buf), "%d%%", percent);
+        static char buf[8]; // buf can be declared here or remain static in the function
+        snprintf(buf, sizeof(buf), "%d%%", display_percent);
         lv_label_set_text(backlight_slider_value_label, buf);
+
+        // Get dimensions for calculations
+        lv_coord_t slider_height = lv_obj_get_height(slider);
+        lv_coord_t label_height = lv_obj_get_height(backlight_slider_value_label);
+
+        // Calculate the Y percentage for alignment.
+        // LVGL's y percentage in align_to usually works from the reference point (e.g. slider's top).
+        // A slider's value (0-100) typically means 0 is bottom, 100 is top for vertical.
+        // We want the label to move from top (for 100%) to bottom (for 0%).
+        // So, an offset from the slider's top edge is ( (100 - display_percent) / 100.0 ) * slider_height
+
+        lv_coord_t y_offset_on_slider = (lv_coord_t)(((100.0f - display_percent) / 100.0f) * slider_height);
+
+        // To center the label text vertically with this point on the slider:
+        lv_coord_t final_y_offset_for_align = y_offset_on_slider - (label_height / 2);
+
+        // Clamp this offset to keep the label mostly within the visual height of the slider
+        if (final_y_offset_for_align < 0) {
+            final_y_offset_for_align = 0;
+        }
+        if (final_y_offset_for_align + label_height > slider_height) {
+            final_y_offset_for_align = slider_height - label_height;
+        }
+
+        // Align the label: 10px to the right of the slider,
+        // with its top edge offset by final_y_offset_for_align from the slider's top edge.
+        lv_obj_align_to(backlight_slider_value_label, slider, LV_ALIGN_OUT_RIGHT_TOP, 40, final_y_offset_for_align);
+// --- CHANGE HORIZONTAL GAP ---
+//lv_coord_t horizontal_gap = 25; // Example: 25 pixels gap
+//lv_obj_align_to(backlight_slider_value_label, slider, LV_ALIGN_OUT_RIGHT_TOP, horizontal_gap, final_y_offset_for_align);
+
+        Serial.printf("DEBUG: Slider Event: percent=%d, using lv_obj_align_to with x_offset=10, y_offset=%d",display_percent, (int)final_y_offset_for_align);
+
+    } else {
+        Serial.println("DEBUG: Slider event CB - backlight_slider_value_label is NULL!");
     }
 }
 
+   // Function 2: show_settings_page
+// Ensure this replaces the definition: void show_settings_page(lv_event_t *e)
+void show_settings_page(lv_event_t *e) {
+    if (!settings_scr) { // Create screen and its elements only once
+        settings_scr = lv_obj_create(NULL); 
+        lv_obj_set_style_bg_color(settings_scr, lv_color_black(), 0);
 
-            // Modify show_settings_page to add button for debug screen
-            void show_settings_page(lv_event_t *e) {
-            if (!settings_scr) {
-                settings_scr = lv_obj_create(NULL);
-                lv_obj_t *label = lv_label_create(settings_scr);
-                lv_obj_set_style_bg_color(settings_scr, lv_color_black(), 0);
-                lv_obj_set_style_text_font(label, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
-                lv_label_set_text(label, "Settings Page");
-                lv_obj_align(label, LV_ALIGN_TOP_MID, 0, 40);
-                lv_obj_set_style_text_color(label, lv_color_white(), 0);
-                // "Push to Clear Alarm" button (existing)
-                alarm_btn = lv_btn_create(settings_scr);
-                lv_obj_set_width(alarm_btn, 120);
-                lv_obj_set_height(alarm_btn, 100);
-                lv_obj_set_style_pad_all(alarm_btn, 10, 0);
-                lv_obj_set_style_border_width(alarm_btn, 5, 0);
-                lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
-                lv_obj_set_style_border_opa(alarm_btn, LV_OPA_COVER, 0);
-                lv_obj_set_style_bg_color(alarm_btn, CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);
-                lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
-                lv_obj_set_style_bg_opa(alarm_btn, LV_OPA_COVER, 0);
-                lv_obj_align(alarm_btn, LV_ALIGN_TOP_MID, 140, -120);
-
-                lv_obj_t *alarm_label = lv_label_create(alarm_btn);
-                lv_label_set_text(alarm_label, "PUSH TO\nCLEAR ALARM");
-                lv_obj_set_style_text_align(alarm_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-                lv_obj_set_style_text_font(alarm_label, &lv_font_montserrat_22, LV_PART_MAIN | LV_STATE_DEFAULT);
-                lv_obj_align(alarm_label, LV_ALIGN_CENTER, 0, 0);
-                lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
+        lv_obj_t *page_title_label = lv_label_create(settings_scr);
+        lv_label_set_text(page_title_label, "Settings Page");
+        lv_obj_set_style_text_font(page_title_label, &lv_font_montserrat_46, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(page_title_label, lv_palette_main(LV_PALETTE_YELLOW), 0);
+        lv_obj_align(page_title_label, LV_ALIGN_TOP_MID, 0, 20);
 
 
 
-                // Create the slider
-                lv_obj_t *settings_scr = lv_obj_create(NULL);
+        alarm_btn = lv_btn_create(settings_scr);
+        lv_obj_set_size(alarm_btn, 160, 120);
+        lv_obj_set_style_pad_all(alarm_btn, 10, 0);
+        lv_obj_set_style_border_width(alarm_btn, 5, 0);
+        lv_obj_set_style_border_color(alarm_btn, lv_color_white(), 0);
+        lv_obj_set_style_bg_color(alarm_btn, CUSTOM_COLOR_2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_color(alarm_btn, lv_color_black(), 0);
+        lv_obj_align(alarm_btn, LV_ALIGN_TOP_RIGHT, -20, 70);
+
+        lv_obj_t *alarm_button_label = lv_label_create(alarm_btn); 
+        lv_label_set_text(alarm_button_label, "SEED\nALARM");
+        lv_obj_set_style_text_align(alarm_button_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(alarm_button_label, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_center(alarm_button_label);
+        lv_obj_add_event_cb(alarm_btn, alarm_ack_callback, LV_EVENT_CLICKED, NULL);
+
+        lv_obj_t *backlight_title_label = lv_label_create(settings_scr);
+        lv_label_set_text(backlight_title_label, "BRIGHTNESS\nOF DISPLAY");
+         lv_obj_set_style_text_font(backlight_title_label, &lv_font_montserrat_18, LV_STATE_DEFAULT); 
+        lv_obj_set_style_text_color(backlight_title_label, lv_color_white(), 0);
+          //lv_obj_align_to(backlight_title_label, backlight_slider, LV_ALIGN_TOP_MID, 0, -30);
+
+        backlight_slider = lv_slider_create(settings_scr);
+        lv_slider_set_range(backlight_slider, 0, 100);
+        lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF); 
+        lv_obj_set_size(backlight_slider, 60, 300); 
+        lv_obj_set_style_bg_color(backlight_slider,  COLOR_TEAL, 0); //COLOR
+        lv_obj_align(backlight_slider,  LV_ALIGN_OUT_LEFT_MID, 80,130); 
+
+// Style for the main track (background) - making it lighter
+lv_obj_set_style_bg_color(backlight_slider, lv_palette_lighten(LV_PALETTE_GREY, 1), LV_PART_MAIN | LV_STATE_DEFAULT);// Light grey track
+lv_obj_set_style_radius(backlight_slider, LV_RADIUS_CIRCLE, LV_PART_MAIN); // Rounded ends for the track
+
+lv_obj_set_style_bg_color(backlight_slider, lv_color_make(0x00, 0x00, 0x80), LV_PART_KNOB);
+lv_obj_set_style_border_color(backlight_slider, lv_palette_darken(LV_PALETTE_BLUE, 9), LV_PART_KNOB); // Optional: darker border for knob
+lv_obj_set_style_border_width(backlight_slider, 5, LV_PART_KNOB); // Optional: border width
+lv_obj_set_style_shadow_width(backlight_slider, 8, LV_PART_KNOB); // Optional: add a little shadow
+lv_obj_set_style_shadow_opa(backlight_slider, LV_OPA_50, LV_PART_KNOB);
+
+        lv_obj_align_to(backlight_title_label, backlight_slider, LV_ALIGN_TOP_MID, 0, -85);
+
+        backlight_slider_value_label = lv_label_create(settings_scr);
+        if (backlight_slider_value_label == NULL) {
+            Serial.println("FATAL ERROR: backlight_slider_value_label is NULL immediately after creation!");
+        } else {
+            Serial.println("INFO: backlight_slider_value_label created successfully.");
+            lv_obj_set_style_text_color(backlight_slider_value_label, lv_color_white(), 0);
+             lv_obj_set_style_text_font(backlight_slider_value_label, &lv_font_montserrat_24, LV_STATE_DEFAULT); 
+            // lv_label_set_text(backlight_slider_value_label, "INIT"); // You can uncomment this for a quick visual check
+        }
+
+        if (backlight_slider && backlight_slider_value_label) { 
+            lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+            Serial.println("INFO: Event callback LV_EVENT_VALUE_CHANGED attached to slider.");
+        } else {
+            Serial.println("ERROR: Not attaching event cb due to NULL slider or value_label.");
+        }
+
+        if (backlight_slider && backlight_slider_value_label) { 
+            Serial.println("INFO: Attempting to send LV_EVENT_VALUE_CHANGED for initial positioning.");
+            lv_event_send(backlight_slider, LV_EVENT_VALUE_CHANGED, NULL);
+        } else {
+            Serial.println("ERROR: Not sending event due to NULL slider or value_label.");
+        } 
+
+        lv_obj_t *back_btn = lv_btn_create(settings_scr);
+        lv_obj_set_size(back_btn, 250, 150);
+        lv_obj_align(back_btn, LV_ALIGN_BOTTOM_MID, 0, -50);
+        lv_obj_t *back_button_label = lv_label_create(back_btn);
+        lv_obj_set_style_text_color(back_button_label, lv_color_black(), 0);
+        lv_obj_set_style_text_font(back_button_label, &lv_font_montserrat_20, LV_STATE_DEFAULT); 
+        lv_label_set_text(back_button_label, "BACK TO\nMAIN SCREEN");
+          lv_obj_set_style_text_align(back_button_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_center(back_button_label);
+        lv_obj_add_event_cb(back_btn, [](lv_event_t * evt) {
+            show_main_page();
+        }, LV_EVENT_CLICKED, NULL);
+        
+// --- Create Signal Strength Indicator on Settings Screen ---
+        signal_container_settings = lv_obj_create(settings_scr);
+        lv_obj_remove_style_all(signal_container_settings);
+        lv_obj_set_size(signal_container_settings, 120, 180); // Adjusted size: 5 bars * (8w+2sp) ~50w, max height ~20+
+        lv_obj_align(signal_container_settings, LV_ALIGN_BOTTOM_MID, 0, -250); // Position:  on settings page
+
+        lv_obj_set_flex_flow(signal_container_settings, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(signal_container_settings, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER);
+         lv_obj_t *signal_label = lv_label_create(signal_container_settings);
+        lv_obj_set_style_text_color(signal_label,lv_palette_main(LV_PALETTE_YELLOW), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_font(signal_label, &lv_font_montserrat_12, LV_STATE_DEFAULT); 
+        lv_label_set_text(signal_label, "ESP-NOW");
+          lv_obj_set_style_text_align(signal_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_coord_t bar_width = 9;        // Width of each signal bar
+        lv_coord_t bar_spacing = 5;      // Spacing between bars
+        lv_coord_t base_bar_height = 26;  // Height of the shortest bar
+        lv_coord_t height_increment = 6; // How much each subsequent bar increases in height
+
+        for (int i = 0; i < MAX_SIGNAL_BARS; i++) {
+            signal_bars[i] = lv_obj_create(signal_container_settings);
+            lv_obj_remove_style_all(signal_bars[i]);
+
+            lv_obj_set_size(signal_bars[i], bar_width, base_bar_height + (i * height_increment));
+            // Default color (dim/inactive) - will be updated by the function
+            lv_obj_set_style_bg_color(signal_bars[i],lv_color_make(0x00, 0xFF, 0x00), LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(signal_bars[i], LV_OPA_COVER, 0);
+            lv_obj_set_style_radius(signal_bars[i], 2, 0);
+        }
+        // --- End Signal Strength Indicator Creation ---
+
+
+    }
     lv_scr_load(settings_scr);
+}
 
-    // Create label: "Backlight"
-    lv_obj_t *slider_label = lv_label_create(settings_scr);
-    lv_label_set_text(slider_label, "Backlight");
-    lv_obj_set_style_text_color(slider_label, lv_color_white(), 0);
-    lv_obj_align(slider_label, LV_ALIGN_TOP_MID, 0, 20);
 
-    // Create backlight slider (vertical)
-    backlight_slider = lv_slider_create(settings_scr);
-    lv_slider_set_range(backlight_slider, 0, 100);
-    lv_slider_set_value(backlight_slider, 100, LV_ANIM_OFF);
-    lv_obj_set_size(backlight_slider, 30, 200); // narrow and tall
-    lv_obj_align(backlight_slider, LV_ALIGN_BOTTOM_MID, -280, -120);
 
-    // Live value label next to knob
-    backlight_slider_value_label = lv_label_create(settings_scr);
-    lv_label_set_text(backlight_slider_value_label, "100");
-    lv_obj_set_style_text_color(backlight_slider_value_label, lv_color_white(), 0);
+// --- Function to Update Signal Strength Display on Settings Screen ---
+void update_signal_strength_display_settings(int level) { // level = 0 (no signal) to 5 (full signal)
+    // Ensure level is within bounds
+    if (level < 0) level = 0;
+    if (level > MAX_SIGNAL_BARS) level = MAX_SIGNAL_BARS;
 
-    // Attach slider event
-    lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    // Serial.printf("Updating signal display to level: %d", level); // Optional: for debugging
 
-    // Trigger callback manually to place label initially
-    //backlight_slider_event_cb(lv_event_create(LV_EVENT_VALUE_CHANGED, backlight_slider));
-    backlight_slider_event_cb(nullptr);
-                /*
-                    // Button to show Debug Screen
-                    lv_obj_t *debug_btn = lv_btn_create(settings_scr);
-                    lv_obj_set_width(debug_btn, 160);
-                    lv_obj_set_height(debug_btn, 60);
-                    lv_obj_align(debug_btn, LV_ALIGN_BOTTOM_MID, 0, -10);
-                    lv_obj_t *debug_btn_label = lv_label_create(debug_btn);
-                    lv_label_set_text(debug_btn_label, "SHOW DEBUG");
-                    lv_obj_center(debug_btn_label);
-                    lv_obj_add_event_cb(debug_btn, [](lv_event_t *e) {
-                        show_debug_screen();
-                    }, LV_EVENT_CLICKED, NULL);
-            */
-                // Back button to return to main screen
-                lv_obj_t *back_btn = lv_btn_create(settings_scr);
-                lv_obj_set_width(back_btn, 120);
-                lv_obj_set_height(back_btn, 60);
-                lv_obj_align(back_btn, LV_ALIGN_BOTTOM_LEFT, 20, -10);
-                lv_obj_t *back_label = lv_label_create(back_btn);
-                lv_label_set_text(back_label, "BACK\nTO MAIN");
-                lv_obj_center(back_label);
-                lv_obj_add_event_cb(
-                back_btn, [](lv_event_t *e) {
-                    show_main_page();
-                },
-                LV_EVENT_CLICKED, NULL);
 
-                // Optionally, assign debug_label for backward compatibility
-                debug_label = debug_label_1;
+    for (int i = 0; i < MAX_SIGNAL_BARS; i++) {
+        if (signal_bars[i]) { // Check if bar object exists
+            if (i < level) {
+                // Active bar color (e.g., white or a shade of green)
+                lv_obj_set_style_bg_color(signal_bars[i],lv_palette_main(LV_PALETTE_YELLOW), LV_PART_MAIN | LV_STATE_DEFAULT);
+            } else {
+                // Inactive bar color (e.g., a darker grey)
+                lv_obj_set_style_bg_color(signal_bars[i], lv_color_hex(0x666666), 0);
             }
-            lv_scr_load(settings_scr);
-            }
+        }
+    }
+}
+// --- End Update Signal Strength Function ---
